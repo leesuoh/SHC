@@ -1,0 +1,55 @@
+version: '3.9'
+
+services:
+
+  # ── PostgreSQL ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: shc-postgres
+    environment:
+      POSTGRES_DB:       shc
+      POSTGRES_USER:     shc_user
+      POSTGRES_PASSWORD: shc_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shc_user -d shc"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Spring Boot API ──
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: shc-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      DB_URL:      jdbc:postgresql://postgres:5432/shc
+      DB_USERNAME: shc_user
+      DB_PASSWORD: shc_pass
+      JWT_SECRET:  shc-docker-dev-secret-change-in-prod
+    ports:
+      - "8080:8080"
+
+  # ── FastAPI OCR ──
+  ocr:
+    build:
+      context: ./ocr-ai
+      dockerfile: Dockerfile
+    container_name: shc-ocr
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      FRONTEND_URL:   http://localhost:5173
+    ports:
+      - "8001:8001"
+
+volumes:
+  postgres_data:

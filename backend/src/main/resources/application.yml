@@ -1,0 +1,61 @@
+spring:
+  profiles:
+    active: local   # local | prod
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/shc}
+    username: ${DB_USERNAME:shc_user}
+    password: ${DB_PASSWORD:shc_pass}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate          # 운영: validate (schema.sql이 정답)
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  sql:
+    init:
+      mode: never                 # schema.sql 자동 실행 안 함 (Flyway 또는 수동)
+
+server:
+  port: ${PORT:8080}
+
+shc:
+  jwt:
+    secret: ${JWT_SECRET:shc-local-dev-secret-key-must-be-changed-in-production}
+    expiration-ms: 3600000        # 1시간
+    refresh-expiration-ms: 604800000  # 7일
+
+  cors:
+    allowed-origins:
+      - http://localhost:5173     # Vite dev server
+      - http://localhost:4173     # Vite preview
+      - ${FRONTEND_URL:http://localhost:5173}
+
+---
+# ── 로컬 개발 프로파일 ──
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  jpa:
+    hibernate:
+      ddl-auto: update            # 로컬에선 편의상 update
+    show-sql: true
+
+---
+# ── 운영 프로파일 ──
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false

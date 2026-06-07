@@ -1,0 +1,30 @@
+# ── 환경 변수 (절대 커밋 금지) ──
+.env
+.env.local
+.env.production
+*.env
+
+# ── Frontend ──
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ── Backend ──
+backend/build/
+backend/.gradle/
+backend/out/
+
+# ── OCR / Python ──
+ocr-ai/__pycache__/
+ocr-ai/*.pyc
+ocr-ai/venv/
+ocr-ai/.venv/
+
+# ── IDE ──
+.idea/
+*.iml
+.vscode/
+*.DS_Store
+
+# ── Docker ──
+docker-compose.override.yml
