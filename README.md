@@ -1,10 +1,10 @@
 <div align="center">
 
-![header](https://capsule-render.vercel.app/api?type=waving&color=timeGradient&height=250&section=header&text=SHC%20%28Smart%20Handling%20for%20Cars%29&fontSize=40&fontAlignY=35&desc=Enterprise-Grade%20WRP%20%26%20Real-Time%20Operation%20Management&descAlignY=55&descAlign=50)
+![header](https://capsule-render.vercel.app/api?type=waving&color=timeGradient&height=250&section=header&text=SHC%20%28Smart%20Handling%20for%20Cars%29&fontSize=40&fontAlignY=35&desc=Enterprise-Grade%20WRP%20%26%20Real-Time%20Operation%20Management&descAlignY=55&descAlign=50&v=2)
 
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=18&duration=3000&pause=1000&color=2780F3&center=true&vCenter=true&width=600&lines=Enterprise-Grade+WRP+System;Mobile-First+Architecture;Real-Time+Operation+Management;Zero-Downtime+Deployment)](https://git.io/typing-svg)
+[![Typing SVG](https://readme-typing-svg.demolab.com?font=Inter&weight=600&size=18&duration=3000&pause=1000&color=2780F3&center=true&vCenter=true&width=600&lines=Enterprise-Grade+WRP+System;Mobile-First+Architecture;Real-Time+Operation+Management;Zero-Downtime+Deployment&v=2)](https://git.io/typing-svg)
 
-[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fleesuoh%2FSHC&count_bg=%232780F3&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
+[![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fleesuoh%2FSHC&count_bg=%232780F3&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false&v=2)](https://hits.seeyoufarm.com)
 
 </div>
 
