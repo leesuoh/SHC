@@ -31,10 +31,7 @@ shc:
     refresh-expiration-ms: 604800000  # 7일
 
   cors:
-    allowed-origins:
-      - http://localhost:5173     # Vite dev server
-      - http://localhost:4173     # Vite preview
-      - ${FRONTEND_URL:http://localhost:5173}
+    allowed-origins: "http://localhost:5173,http://localhost:5174,http://localhost:4173,${FRONTEND_URL:http://localhost:5173}"
 
 ---
 # ── 로컬 개발 프로파일 ──
