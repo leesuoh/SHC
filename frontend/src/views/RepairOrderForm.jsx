@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { MECHANICS, ENGINE_OIL_GASOLINE, ENGINE_OIL_DIESEL, OTHER_PRESETS, PAYMENT_TYPES } from '../data/mockData'
 import { orderApi, paymentApi } from '../api/client'
+import CameraGuideModal from '../components/CameraGuideModal'
 
 const OCR_URL = import.meta.env.VITE_OCR_URL || 'http://localhost:8001'
 
@@ -327,9 +328,10 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
   const [items, setItems]           = useState(existingOrder?.items.map(it => ({ ...it, id: nextItemId++ })) || [])
   const [paymentType, setPaymentType] = useState(existingOrder?.paymentType || null)
 
-  const [modal, setModal]     = useState(null)   // null | 'oil' | 'other'
-  const [saving, setSaving]   = useState(false)
-  const [ocrLoading, setOcrLoading] = useState('')  // 'plate' | 'vin' | 'odometer' | ''
+  const [modal, setModal]           = useState(null)   // null | 'oil' | 'other'
+  const [saving, setSaving]         = useState(false)
+  const [ocrLoading, setOcrLoading] = useState('')     // 'plate' | 'vin' | 'odometer' | ''
+  const [cameraType, setCameraType] = useState(null)   // null | 'vin' | 'plate' | 'odometer'
   const plateInputRef = useRef(null)
   const vinInputRef   = useRef(null)
   const odomInputRef  = useRef(null)
@@ -337,35 +339,57 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
   const total = items.reduce((s, it) => s + (Number(it.price) || 0), 0)
   const vinFilled = !!(vin || model || year)
 
-  // ── OCR: 파일 선택 → FastAPI 호출 ──
-  const triggerOcr = (type, inputRef) => {
+  // ── OCR: 이미지 blob/file → FastAPI 호출 ──
+  const processOcrFile = async (type, file) => {
+    setOcrLoading(type)
+    try {
+      if (type === 'plate') {
+        const r = await callOcr('plate', file)
+        setPlateOcr(r)
+      } else if (type === 'vin') {
+        const r = await callOcr('vin', file)
+        setVinOcr(r)
+      } else if (type === 'odometer') {
+        const r = await callOcr('odometer', file)
+        setOdomOcr({ mileage: r.mileage.toLocaleString() })
+      }
+    } catch {
+      // OCR 서비스 없을 때 시뮬레이션 폴백
+      if (type === 'plate')    setPlateOcr({ plate_number: '12가 3456', confidence: 0.9 })
+      if (type === 'vin')      setVinOcr({ vin: 'KMHD241ABNU123456', model: '현대 아반떼 CN7', year: 2021, confidence: 0.9 })
+      if (type === 'odometer') setOdomOcr({ mileage: '42,180' })
+    } finally {
+      setOcrLoading('')
+    }
+  }
+
+  // 번호판: 단순 파일 선택 (어느 방향이든 잘 인식되므로 가이드 불필요)
+  const triggerPlateOcr = () => {
     const input = document.createElement('input')
     input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment'
-    input.onchange = async (e) => {
+    input.onchange = (e) => {
       const file = e.target.files[0]
-      if (!file) return
-      setOcrLoading(type)
-      try {
-        if (type === 'plate') {
-          const r = await callOcr('plate', file)
-          setPlateOcr(r)
-        } else if (type === 'vin') {
-          const r = await callOcr('vin', file)
-          setVinOcr(r)
-        } else if (type === 'odometer') {
-          const r = await callOcr('odometer', file)
-          setOdomOcr({ mileage: r.mileage.toLocaleString() })
-        }
-      } catch {
-        // OCR 서비스 없을 때 시뮬레이션 폴백
-        if (type === 'plate')    setPlateOcr({ plate_number: '12가 3456', confidence: 0.9 })
-        if (type === 'vin')      setVinOcr({ vin: 'KMHD241ABNU123456', model: '현대 아반떼 CN7', year: 2021, confidence: 0.9 })
-        if (type === 'odometer') setOdomOcr({ mileage: '42,180' })
-      } finally {
-        setOcrLoading('')
-      }
+      if (file) processOcrFile('plate', file)
     }
     input.click()
+  }
+
+  // VIN / 계기판: 가이드 프레임 카메라 모달 열기
+  const triggerOcr = (type) => {
+    if (type === 'plate') {
+      triggerPlateOcr()
+    } else {
+      setCameraType(type)  // 가이드 모달 오픈
+    }
+  }
+
+  // 카메라 모달에서 캡처 완료
+  const handleCameraCapture = (blobOrFile) => {
+    setCameraType(null)
+    const file = blobOrFile instanceof Blob && !(blobOrFile instanceof File)
+      ? new File([blobOrFile], `capture_${cameraType}.jpg`, { type: 'image/jpeg' })
+      : blobOrFile
+    processOcrFile(cameraType, file)
   }
 
   const confirmPlateOcr = () => { setPlateNumber(plateOcr.plate_number || plateOcr.plateNumber || ''); setPlateOcr(null) }
@@ -624,6 +648,15 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
 
       {modal === 'oil'   && <OilPicker onSelect={addPreset} onClose={() => setModal(null)} />}
       {modal === 'other' && <OtherPresetPicker onSelect={addPreset} onClose={() => setModal(null)} />}
+
+      {/* VIN / 계기판 가이드 카메라 */}
+      {cameraType && (
+        <CameraGuideModal
+          type={cameraType}
+          onCapture={handleCameraCapture}
+          onClose={() => setCameraType(null)}
+        />
+      )}
     </>
   )
 }

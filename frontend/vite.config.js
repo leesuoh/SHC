@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  server: {
+    host: true,      // 0.0.0.0 — 같은 Wi-Fi 기기에서 접속 가능
+    port: 5174,
+  },
   plugins: [
     react(),
     VitePWA({
