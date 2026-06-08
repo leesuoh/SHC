@@ -3,7 +3,7 @@ spring:
     active: local   # local | prod
 
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/shc}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/shc_db}
     username: ${DB_USERNAME:shc_user}
     password: ${DB_PASSWORD:shc_pass}
     driver-class-name: org.postgresql.Driver
@@ -31,7 +31,7 @@ shc:
     refresh-expiration-ms: 604800000  # 7일
 
   cors:
-    allowed-origins: "http://localhost:5173,http://localhost:5174,http://localhost:4173,${FRONTEND_URL:http://localhost:5173}"
+    allowed-origins: "http://localhost:5173,http://localhost:5174,http://localhost:4173,http://172.17.129.18:5174,${FRONTEND_URL:http://localhost:5173}"
 
 ---
 # ── 로컬 개발 프로파일 ──
