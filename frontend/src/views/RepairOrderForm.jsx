@@ -51,17 +51,37 @@ function OcrConfirmBanner({ title, fields, onConfirm, onEdit }) {
 }
 
 // ── Camera Button ───────────────────────────────────────────────────────────
-function CameraButton({ label, onClick }) {
+function CameraButton({ label = '카메라', onClick }) {
   return (
     <button onClick={onClick} style={{
       display:'flex', alignItems:'center', gap:5,
       background:'#f2f2f7', border:'1.5px dashed #c7c7cc', borderRadius:10,
       padding:'7px 12px', cursor:'pointer', fontFamily:'inherit',
       color:'#3c3c43', fontSize:12, fontWeight:600, flexShrink:0,
-      transition:'all 0.15s'
+      transition:'all 0.15s', WebkitTapHighlightColor:'transparent',
     }}>
       <span style={{ fontSize:14 }}>📷</span>{label}
     </button>
+  )
+}
+
+// ── Gallery Button (파일 선택) ───────────────────────────────────────────────
+function GalleryButton({ type, onFile }) {
+  return (
+    <label style={{
+      display:'flex', alignItems:'center', gap:5,
+      background:'#f2f2f7', border:'1.5px dashed #c7c7cc', borderRadius:10,
+      padding:'7px 12px', cursor:'pointer', fontFamily:'inherit',
+      color:'#3c3c43', fontSize:12, fontWeight:600, flexShrink:0,
+      transition:'all 0.15s', WebkitTapHighlightColor:'transparent',
+    }}>
+      <span style={{ fontSize:14 }}>🖼</span>갤러리
+      <input
+        type="file" accept="image/*"
+        style={{ display:'none' }}
+        onChange={e => { const f = e.target.files[0]; if (f) onFile(f) }}
+      />
+    </label>
   )
 }
 
@@ -223,52 +243,97 @@ function OilPicker({ onSelect, onClose }) {
   )
 }
 
-// ── Other Preset Picker ─────────────────────────────────────────────────────
+// ── Other Preset Picker — 세로 아코디언 ────────────────────────────────────
 function OtherPresetPicker({ onSelect, onClose }) {
-  const [activeIdx, setActiveIdx] = useState(0)
-  const cat = OTHER_PRESETS[activeIdx]
+  const [openIdx, setOpenIdx] = useState(0) // 열린 카테고리 인덱스
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight:'92svh' }}>
         <div className="modal-handle" />
         <div style={{ padding:'14px 20px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <div style={{ fontSize:18, fontWeight:700, color:'#1c1c1e' }}>항목 선택</div>
+          <div style={{ fontSize:18, fontWeight:700, color:'#1c1c1e' }}>🔧 항목 선택</div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-
-        {/* Category tabs */}
-        <div style={{ display:'flex', gap:6, padding:'12px 20px', overflowX:'auto', borderBottom:'0.5px solid #e5e5ea' }}>
-          {OTHER_PRESETS.map((c, i) => (
-            <button key={c.category} onClick={() => setActiveIdx(i)} style={{
-              padding:'7px 14px', borderRadius:20, border:'none', cursor:'pointer',
-              fontFamily:'inherit', fontSize:12, fontWeight:600, whiteSpace:'nowrap',
-              background: activeIdx === i ? '#1c1c1e' : '#f2f2f7',
-              color: activeIdx === i ? '#fff' : '#3c3c43', transition:'all 0.15s',
-              display:'flex', alignItems:'center', gap:4
-            }}>
-              {c.icon} {c.category}
-            </button>
-          ))}
+        <div style={{ fontSize:12, color:'#8e8e93', padding:'4px 20px 12px' }}>
+          카테고리를 눌러 항목을 선택하세요
         </div>
 
-        <div style={{ padding:'12px 20px 32px', display:'flex', flexDirection:'column', gap:6 }}>
-          {cat.items.map(item => (
-            <button key={item.id} onClick={() => { onSelect(item); onClose() }} style={{
-              display:'flex', justifyContent:'space-between', alignItems:'center',
-              padding:'14px 16px', borderRadius:14, border:'1.5px solid #e5e5ea',
-              background:'#fafafa', cursor:'pointer', fontFamily:'inherit',
-              transition:'all 0.12s', textAlign:'left'
-            }}>
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:14, color:'#1c1c1e', fontWeight:600 }}>{item.name}</div>
-                {item.note && <div style={{ fontSize:11, color:'#aeaeb2', marginTop:2 }}>{item.note}</div>}
+        {/* 세로 아코디언 */}
+        <div style={{ overflowY:'auto', padding:'0 20px 40px', display:'flex', flexDirection:'column', gap:8 }}>
+          {OTHER_PRESETS.map((cat, i) => {
+            const isOpen = openIdx === i
+            return (
+              <div key={cat.category} style={{
+                borderRadius: 16,
+                border: `1.5px solid ${isOpen ? '#1c1c1e' : '#e5e5ea'}`,
+                overflow: 'hidden',
+                transition: 'border-color 0.15s',
+              }}>
+                {/* 카테고리 헤더 */}
+                <button
+                  onClick={() => setOpenIdx(isOpen ? -1 : i)}
+                  style={{
+                    width:'100%', display:'flex', alignItems:'center', gap:10,
+                    padding:'14px 16px', border:'none',
+                    background: isOpen ? '#1c1c1e' : '#fafafa',
+                    cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                    transition:'background 0.15s',
+                  }}
+                >
+                  <span style={{ fontSize:20 }}>{cat.icon}</span>
+                  <span style={{ flex:1, fontSize:15, fontWeight:700,
+                    color: isOpen ? '#fff' : '#1c1c1e' }}>
+                    {cat.category}
+                  </span>
+                  <span style={{ fontSize:12, color: isOpen ? 'rgba(255,255,255,0.5)' : '#aeaeb2' }}>
+                    {cat.items.length}개
+                  </span>
+                  <span style={{
+                    fontSize:16, color: isOpen ? '#fff' : '#c7c7cc',
+                    transform: isOpen ? 'rotate(180deg)' : 'none',
+                    transition:'transform 0.2s', display:'inline-block',
+                  }}>⌄</span>
+                </button>
+
+                {/* 항목 목록 */}
+                {isOpen && (
+                  <div style={{ display:'flex', flexDirection:'column', gap:1, background:'#fff' }}>
+                    {cat.items.map((item, j) => (
+                      <button
+                        key={item.id}
+                        onClick={() => { onSelect(item); onClose() }}
+                        style={{
+                          display:'flex', justifyContent:'space-between', alignItems:'center',
+                          padding:'13px 16px',
+                          borderTop: j > 0 ? '1px solid #f2f2f7' : 'none',
+                          border:'none', background:'#fff',
+                          cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                          transition:'background 0.1s',
+                          WebkitTapHighlightColor: 'transparent',
+                        }}
+                        onMouseOver={e => e.currentTarget.style.background='#f9f9fb'}
+                        onMouseOut={e => e.currentTarget.style.background='#fff'}
+                      >
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:14, color:'#1c1c1e', fontWeight:600 }}>{item.name}</div>
+                          {item.note && (
+                            <div style={{ fontSize:11, color:'#aeaeb2', marginTop:2 }}>{item.note}</div>
+                          )}
+                        </div>
+                        <span style={{
+                          fontSize:15, color:'#007aff', fontWeight:700,
+                          fontVariantNumeric:'tabular-nums', flexShrink:0, marginLeft:12
+                        }}>
+                          {item.price.toLocaleString()}원
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              <span style={{ fontSize:15, color:'#007aff', fontWeight:700, fontVariantNumeric:'tabular-nums', flexShrink:0, marginLeft:12 }}>
-                {item.price.toLocaleString()}원
-              </span>
-            </button>
-          ))}
+            )
+          })}
         </div>
       </div>
     </div>
@@ -339,7 +404,7 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
   const total = items.reduce((s, it) => s + (Number(it.price) || 0), 0)
   const vinFilled = !!(vin || model || year)
 
-  // ── OCR: 이미지 blob/file → FastAPI 호출 ──
+  // ── OCR: 이미지 file → FastAPI 호출 ──
   const processOcrFile = async (type, file) => {
     setOcrLoading(type)
     try {
@@ -351,45 +416,28 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
         setVinOcr(r)
       } else if (type === 'odometer') {
         const r = await callOcr('odometer', file)
-        setOdomOcr({ mileage: r.mileage.toLocaleString() })
+        setOdomOcr({ mileage: r.mileage ? r.mileage.toLocaleString() : '0' })
       }
-    } catch {
-      // OCR 서비스 없을 때 시뮬레이션 폴백
-      if (type === 'plate')    setPlateOcr({ plate_number: '12가 3456', confidence: 0.9 })
-      if (type === 'vin')      setVinOcr({ vin: 'KMHD241ABNU123456', model: '현대 아반떼 CN7', year: 2021, confidence: 0.9 })
-      if (type === 'odometer') setOdomOcr({ mileage: '42,180' })
+    } catch (err) {
+      alert(`OCR 인식 실패: ${err.message}\nOCR 서비스(포트 8001)가 실행 중인지 확인해주세요.`)
     } finally {
       setOcrLoading('')
     }
   }
 
-  // 번호판: 단순 파일 선택 (어느 방향이든 잘 인식되므로 가이드 불필요)
-  const triggerPlateOcr = () => {
-    const input = document.createElement('input')
-    input.type = 'file'; input.accept = 'image/*'; input.capture = 'environment'
-    input.onchange = (e) => {
-      const file = e.target.files[0]
-      if (file) processOcrFile('plate', file)
-    }
-    input.click()
-  }
-
-  // VIN / 계기판: 가이드 프레임 카메라 모달 열기
+  // 모든 촬영 타입 → 가이드 모달 오픈
   const triggerOcr = (type) => {
-    if (type === 'plate') {
-      triggerPlateOcr()
-    } else {
-      setCameraType(type)  // 가이드 모달 오픈
-    }
+    setCameraType(type)
   }
 
-  // 카메라 모달에서 캡처 완료
+  // 카메라 모달에서 캡처/갤러리 선택 완료
   const handleCameraCapture = (blobOrFile) => {
+    const capturedType = cameraType
     setCameraType(null)
     const file = blobOrFile instanceof Blob && !(blobOrFile instanceof File)
-      ? new File([blobOrFile], `capture_${cameraType}.jpg`, { type: 'image/jpeg' })
+      ? new File([blobOrFile], `capture_${capturedType}.jpg`, { type: 'image/jpeg' })
       : blobOrFile
-    processOcrFile(cameraType, file)
+    processOcrFile(capturedType, file)
   }
 
   const confirmPlateOcr = () => { setPlateNumber(plateOcr.plate_number || plateOcr.plateNumber || ''); setPlateOcr(null) }
@@ -480,39 +528,76 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
             <div style={{ marginBottom:16 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
                 <div className="form-label">차량 등록 번호 *</div>
-                {!plateNumber && <CameraButton label={ocrLoading==='plate' ? '인식 중...' : '번호판 촬영'} onClick={() => triggerOcr('plate')} />}
+                {ocrLoading === 'plate'
+                  ? <span style={{ fontSize:12, color:'#8e8e93' }}>🔍 인식 중...</span>
+                  : (
+                    <div style={{ display:'flex', gap:6 }}>
+                      <CameraButton label="카메라" onClick={() => triggerOcr('plate')} />
+                      <GalleryButton type="plate" onFile={f => processOcrFile('plate', f)} />
+                    </div>
+                  )
+                }
               </div>
               <input type="text" value={plateNumber} onChange={e => setPlateNumber(e.target.value)} placeholder="12가 3456" className="field-input" style={{ fontSize:26, fontWeight:900, letterSpacing:'0.06em' }} />
               {plateOcr && (
-                <OcrConfirmBanner title="번호판" fields={[{ label:'차량 번호', value:plateOcr.plateNumber, mono:true }]} onConfirm={confirmPlateOcr} onEdit={() => setPlateOcr(null)} />
+                <OcrConfirmBanner title="번호판" fields={[{ label:'차량 번호', value: plateOcr.plate_number || plateOcr.plateNumber || '인식 실패', mono:true }, { label:'신뢰도', value: plateOcr.confidence ? `${Math.round(plateOcr.confidence*100)}%` : '-' }]} onConfirm={confirmPlateOcr} onEdit={() => { setPlateOcr(null); triggerOcr('plate') }} />
               )}
             </div>
 
             {/* 차대번호 스티커 */}
             <div style={{ marginBottom:14 }}>
-              <div className="form-label" style={{ marginBottom:8 }}>차대번호 스티커 (차종 · 연식 · VIN 자동 인식)</div>
-              {!vinFilled && !vinOcr && (
-                <button onClick={() => triggerOcr('vin')} style={{
-                  width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                  padding:'22px 0', gap:8, background:'#fafafa', border:'2px dashed #c7c7cc',
-                  borderRadius:14, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s'
-                }}
-                  onMouseOver={e => { e.currentTarget.style.borderColor='#007aff'; e.currentTarget.style.background='#f0f5ff' }}
-                  onMouseOut={e => { e.currentTarget.style.borderColor='#c7c7cc'; e.currentTarget.style.background='#fafafa' }}
-                >
-                  <div style={{ fontSize:30 }}>📷</div>
-                  <div style={{ fontSize:14, fontWeight:700, color:'#3c3c43' }}>차대번호 스티커 촬영</div>
-                  <div style={{ fontSize:11, color:'#8e8e93', textAlign:'center', lineHeight:1.6 }}>운전석 도어 옆 스티커를 촬영하면<br />차종 · 연식 · VIN이 자동 입력됩니다</div>
-                </button>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+                <div className="form-label">차대번호 스티커 (차종 · 연식 · VIN 자동 인식)</div>
+                {ocrLoading === 'vin' && <span style={{ fontSize:12, color:'#8e8e93' }}>🔍 인식 중...</span>}
+              </div>
+              {!vinFilled && !vinOcr && ocrLoading !== 'vin' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  <button onClick={() => triggerOcr('vin')} style={{
+                    width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                    padding:'20px 0', gap:8, background:'#fafafa', border:'2px dashed #c7c7cc',
+                    borderRadius:14, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s',
+                    WebkitTapHighlightColor:'transparent',
+                  }}
+                    onMouseOver={e => { e.currentTarget.style.borderColor='#007aff'; e.currentTarget.style.background='#f0f5ff' }}
+                    onMouseOut={e => { e.currentTarget.style.borderColor='#c7c7cc'; e.currentTarget.style.background='#fafafa' }}
+                  >
+                    <div style={{ fontSize:28 }}>📷</div>
+                    <div style={{ fontSize:14, fontWeight:700, color:'#3c3c43' }}>카메라로 촬영</div>
+                    <div style={{ fontSize:11, color:'#8e8e93', textAlign:'center', lineHeight:1.6 }}>가이드 프레임에 맞춰 촬영하면<br />차종 · 연식 · VIN이 자동 입력됩니다</div>
+                  </button>
+                  <label style={{
+                    width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+                    padding:'12px 0', background:'#f2f2f7', border:'1.5px solid #e5e5ea',
+                    borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                    fontSize:13, fontWeight:600, color:'#3c3c43',
+                    WebkitTapHighlightColor:'transparent',
+                  }}>
+                    <span>🖼</span> 갤러리에서 선택
+                    <input type="file" accept="image/*" style={{ display:'none' }}
+                      onChange={e => { const f = e.target.files[0]; if(f) processOcrFile('vin', f) }} />
+                  </label>
+                </div>
               )}
               {vinOcr && (
-                <OcrConfirmBanner title="차대번호 스티커" fields={[{ label:'VIN', value:vinOcr.vin, mono:true }, { label:'차종', value:vinOcr.model }, { label:'연식', value:vinOcr.year+'년식' }]} onConfirm={confirmVinOcr} onEdit={() => setVinOcr(null)} />
+                <OcrConfirmBanner title="차대번호 스티커"
+                  fields={[
+                    { label:'VIN', value: vinOcr.vin || '인식 실패', mono:true },
+                    { label:'마지막 6자리', value: vinOcr.last_6 || (vinOcr.vin ? vinOcr.vin.slice(-6) : '-'), mono:true },
+                    { label:'차종', value: vinOcr.model || '-' },
+                    { label:'연식', value: vinOcr.year ? vinOcr.year+'년식' : '-' },
+                    { label:'신뢰도', value: vinOcr.confidence ? `${Math.round(vinOcr.confidence*100)}%` : '-' },
+                  ]}
+                  onConfirm={confirmVinOcr}
+                  onEdit={() => { setVinOcr(null); triggerOcr('vin') }} />
               )}
               {vinFilled && !vinOcr && (
                 <div style={{ background:'#f0fdf4', border:'1.5px solid #34c759', borderRadius:14, padding:'14px 16px' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
                     <span style={{ fontSize:12, fontWeight:700, color:'#1a7a35' }}>✓ 차대번호 스티커 인식 완료</span>
-                    <CameraButton label="재촬영" onClick={() => triggerOcr('vin')} />
+                    <div style={{ display:'flex', gap:6 }}>
+                      <CameraButton label="재촬영" onClick={() => triggerOcr('vin')} />
+                      <GalleryButton type="vin" onFile={f => processOcrFile('vin', f)} />
+                    </div>
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px 16px' }}>
                     <div>
@@ -533,20 +618,29 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
             </div>
 
             {/* 주행거리 */}
-            <div style={{ display:'flex', gap:10, alignItems:'flex-end', marginBottom:14 }}>
-              <div style={{ flex:1 }}>
-                <div className="form-label" style={{ marginBottom:6 }}>입고 시 주행거리 (km)</div>
-                <div style={{ display:'flex', alignItems:'center', gap:4 }}>
-                  <input type="text" value={mileage} onChange={e => setMileage(e.target.value)} placeholder="42,180" className="field-input" style={{ flex:1, fontSize:18, fontWeight:700, fontVariantNumeric:'tabular-nums' }} />
-                  <span style={{ fontSize:13, color:'#8e8e93', paddingBottom:4, flexShrink:0 }}>km</span>
-                </div>
-                {odomOcr && (
-                  <OcrConfirmBanner title="계기판" fields={[{ label:'주행거리', value:odomOcr.mileage+' km' }]} onConfirm={confirmOdomOcr} onEdit={() => setOdomOcr(null)} />
-                )}
+            <div style={{ marginBottom:14 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                <div className="form-label">입고 시 주행거리 (km)</div>
+                {ocrLoading === 'odometer'
+                  ? <span style={{ fontSize:12, color:'#8e8e93' }}>🔍 인식 중...</span>
+                  : (
+                    <div style={{ display:'flex', gap:6 }}>
+                      <CameraButton label="계기판 촬영" onClick={() => triggerOcr('odometer')} />
+                      <GalleryButton type="odometer" onFile={f => processOcrFile('odometer', f)} />
+                    </div>
+                  )
+                }
               </div>
-              <div style={{ paddingBottom:4 }}>
-                <CameraButton label={ocrLoading==='odometer' ? '인식 중...' : '계기판 촬영'} onClick={() => triggerOcr('odometer')} />
+              <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <input type="text" value={mileage} onChange={e => setMileage(e.target.value)} placeholder="42,180" className="field-input" style={{ flex:1, fontSize:18, fontWeight:700, fontVariantNumeric:'tabular-nums' }} />
+                <span style={{ fontSize:13, color:'#8e8e93', flexShrink:0 }}>km</span>
               </div>
+              {odomOcr && (
+                <OcrConfirmBanner title="계기판"
+                  fields={[{ label:'주행거리', value: odomOcr.mileage + ' km' }]}
+                  onConfirm={confirmOdomOcr}
+                  onEdit={() => { setOdomOcr(null); triggerOcr('odometer') }} />
+              )}
             </div>
 
             {/* 담당 정비사 */}
