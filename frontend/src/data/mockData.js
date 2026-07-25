@@ -2,7 +2,6 @@ export const MECHANICS = [
   { id: 1, name: '사장님', grade: 'A', role: 'admin' },
   { id: 2, name: '부장님', grade: 'A', role: 'mechanic' },
   { id: 3, name: '이수오', grade: 'B', role: 'mechanic' },
-  { id: 4, name: '막내',   grade: 'B', role: 'mechanic' },
 ]
 
 export const PAYMENT_TYPES = [

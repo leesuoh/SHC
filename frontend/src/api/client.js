@@ -1,5 +1,6 @@
 // ── API 기본 설정 ──
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// 비워두면 상대경로(/api/...) — Vite 프록시 및 운영 Nginx가 같은 주소로 라우팅
+const BASE_URL = import.meta.env.VITE_API_URL ?? ''
 
 function getToken() {
   return localStorage.getItem('shc_token')
@@ -28,6 +29,11 @@ async function request(method, path, body = null) {
 // ── Auth ──
 export const authApi = {
   login: (name, pin) => request('POST', '/api/auth/login', { name, pin }),
+}
+
+// ── Mechanics (직원 목록 — DB가 유일한 출처) ──
+export const mechanicApi = {
+  getAll: () => request('GET', '/api/mechanics'),
 }
 
 // ── Orders ──

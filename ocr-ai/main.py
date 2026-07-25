@@ -14,15 +14,16 @@ load_dotenv()
 app = FastAPI(title="SHC OCR Service", version="2.0.0")
 
 _origins = [
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:4173",
-    "http://172.17.129.18:5174",
     os.getenv("FRONTEND_URL", ""),
 ]
+# 로컬 개발: localhost + 사설 IP 대역(192.168.x.x, 172.x.x.x)의 모든 포트 허용
+# → 맥북 IP가 바뀌어도 모바일 테스트가 계속 동작
+_origin_regex = r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|172\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o for o in _origins if o],
+    allow_origin_regex=_origin_regex,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -45,6 +46,20 @@ class VinResult(BaseModel):
 class OdometerResult(BaseModel):
     mileage: int
     confidence: float
+
+class OilSpecRequest(BaseModel):
+    model: str | None = None
+    year: int | None = None
+    vin: str | None = None
+    fuel_type: str | None = None
+
+class OilSpecResult(BaseModel):
+    liters: float | None = None        # 권장 주입량 (필터 포함)
+    fuel_type: str | None = None       # gasoline | diesel
+    viscosity: str | None = None       # 예: 5W-30
+    recognized: bool = False           # 모델이 실제로 아는 차량인지
+    note: str | None = None
+    confidence: float = 0.0
 
 
 async def image_to_b64(file: UploadFile) -> tuple[str, str]:
@@ -139,6 +154,54 @@ JSON만 응답: {"mileage": 실제숫자, "confidence": 0.95}"""
         return OdometerResult(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OCR 실패: {e}")
+
+
+@app.post("/spec/oil", response_model=OilSpecResult)
+async def spec_oil(req: OilSpecRequest):
+    """차종·연식으로 엔진오일 권장 사양을 조회한다.
+
+    어디까지나 '추천'이다 — 최종 선택은 정비사가 화면에서 직접 누른다.
+    확신이 없으면 confidence를 낮게 주도록 프롬프트에 명시했다.
+    """
+    if not (req.model or req.vin):
+        raise HTTPException(status_code=400, detail="차종 또는 VIN이 필요합니다")
+
+    prompt = f"""너는 한국 자동차 정비소의 엔진오일 사양 참고 도우미다.
+
+차량 정보:
+- 차종: {req.model or "(모름)"}
+- 연식: {req.year or "(모름)"}
+- 차대번호(VIN): {req.vin or "(모름)"}
+- 연료: {req.fuel_type or "(모름)"}
+
+이 차량의 엔진오일 교환 시 필요한 양(리터)과 권장 점도를 알려줘.
+
+규칙:
+- liters: 필터까지 교환할 때 실제로 주입하는 양. 3~10 사이 정수 또는 .5 단위.
+- fuel_type: "gasoline" 또는 "diesel" 중 하나. LPG는 gasoline으로 분류.
+- viscosity: "5W-30" 같은 형식.
+- recognized: 위 차종이 네가 실제로 아는 양산 차량이면 true, 아니면 false.
+  차종명이 불분명하거나 실존하지 않는 이름이면 반드시 false.
+- recognized가 false면 confidence는 0.2 이하로 줄 것.
+- 그 차의 정확한 사양이 기억나지 않으면 confidence 0.5 이하.
+- 추측으로 지어내지 말 것. 모르면 모른다고 confidence로 표현할 것.
+- note: 한국어 한 문장. 근거나 주의사항.
+
+JSON만 응답:
+{{"liters": 4.0, "fuel_type": "gasoline", "viscosity": "5W-30", "recognized": true, "note": "...", "confidence": 0.9}}"""
+
+    try:
+        r = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0,
+        )
+        raw = r.choices[0].message.content.strip()
+        raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+        return OilSpecResult(**json.loads(raw))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"오일 사양 조회 실패: {e}")
 
 
 if __name__ == "__main__":

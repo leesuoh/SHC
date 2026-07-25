@@ -28,3 +28,11 @@ ocr-ai/.venv/
 
 # ── Docker ──
 docker-compose.override.yml
+
+# ── Terraform ──
+# .terraform/ : 프로바이더 바이너리(수백 MB) — 받으면 되는 것이라 커밋하지 않는다
+# tfstate     : 실제 인프라 상태. 비밀값이 들어갈 수 있고 환경마다 달라진다
+infra/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars

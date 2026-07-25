@@ -4,8 +4,41 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   server: {
-    host: true,      // 0.0.0.0 — 같은 Wi-Fi 기기에서 접속 가능
+    host: true,          // 0.0.0.0 — 같은 Wi-Fi 기기에서 접속 가능
     port: 5174,
+    strictPort: true,    // 포트가 바뀌면 CORS 설정이 깨지므로 고정
+    allowedHosts: ['.trycloudflare.com'],   // Cloudflare Tunnel 접속 허용
+
+    // 백엔드/OCR을 같은 주소로 프록시 → CORS·혼합콘텐츠 문제 원천 제거
+    //
+    // Origin 헤더를 제거하는 이유:
+    // 브라우저는 POST에 Origin 헤더를 붙이는데, 프록시가 이를 그대로 전달하면
+    // 백엔드가 "허용되지 않은 출처"로 보고 거부한다(Invalid CORS request).
+    // 프록시는 서버 간 통신이라 CORS 검사가 불필요하므로 헤더를 떼어낸다.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'))
+        },
+      },
+      '/ocr': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'))
+        },
+      },
+      // 차종별 오일 사양 추천 — OCR과 같은 AI 서비스에 있다
+      '/spec': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'))
+        },
+      },
+    },
   },
   plugins: [
     react(),
@@ -32,7 +65,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
-            urlPattern: /^https?:\/\/localhost:8080\/api\//,
+            urlPattern: /\/(api|ocr|spec)\//,
             handler: 'NetworkOnly',
           },
         ],

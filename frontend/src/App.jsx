@@ -24,7 +24,7 @@ export default function App() {
   const handleLogin = (user) => {
     setCurrentUser(user)
     setLoggedIn(true)
-    setView('main')
+    setView('lookup')   // 로그인 직후 = 차량 조회 (접수의 첫 동작)
   }
 
   const handleLogout = () => {

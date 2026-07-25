@@ -1,15 +1,26 @@
-import { useState, useRef } from 'react'
-import { MECHANICS, ENGINE_OIL_GASOLINE, ENGINE_OIL_DIESEL, OTHER_PRESETS, PAYMENT_TYPES } from '../data/mockData'
-import { orderApi, paymentApi } from '../api/client'
+import { useState, useRef, useEffect } from 'react'
+import { ENGINE_OIL_GASOLINE, ENGINE_OIL_DIESEL, OTHER_PRESETS, PAYMENT_TYPES } from '../data/mockData'
+import { orderApi, paymentApi, mechanicApi } from '../api/client'
 import CameraGuideModal from '../components/CameraGuideModal'
 
-const OCR_URL = import.meta.env.VITE_OCR_URL || 'http://localhost:8001'
+const OCR_URL = import.meta.env.VITE_OCR_URL ?? ''
 
 async function callOcr(endpoint, file) {
   const form = new FormData()
   form.append('file', file)
   const res = await fetch(`${OCR_URL}/ocr/${endpoint}`, { method: 'POST', body: form })
   if (!res.ok) throw new Error('OCR 실패')
+  return res.json()
+}
+
+// 차종·연식 → 권장 엔진오일 사양. 어디까지나 참고값이고 선택은 정비사가 한다.
+async function fetchOilSpec({ model, year, vin }) {
+  const res = await fetch(`${OCR_URL}/spec/oil`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: model || null, year: year ? Number(year) : null, vin: vin || null }),
+  })
+  if (!res.ok) throw new Error('사양 조회 실패')
   return res.json()
 }
 
@@ -89,11 +100,18 @@ function GalleryButton({ type, onFile }) {
 // 연료 타입별 가장 많이 사용하는 리터
 const POPULAR_LITER = { gasoline: 4, diesel: 7 }
 
-function OilPicker({ onSelect, onClose }) {
-  const [fuelType, setFuelType] = useState('gasoline') // 'gasoline' | 'diesel'
+function OilPicker({ onSelect, onClose, oilSpec }) {
+  // 추천이 있으면 그 연료 타입으로 열어준다 (탭 전환 한 번을 줄인다)
+  const [fuelType, setFuelType] = useState(oilSpec?.fuel_type || 'gasoline') // 'gasoline' | 'diesel'
   const [selectedBrand, setSelectedBrand] = useState(null)
   const brands = fuelType === 'gasoline' ? ENGINE_OIL_GASOLINE : ENGINE_OIL_DIESEL
-  const popularL = POPULAR_LITER[fuelType]
+
+  // 추천 리터가 이 연료 타입에 해당할 때만 '권장'으로 강조.
+  // 없으면 기존의 '최다 사용'으로 되돌아간다.
+  const recommendL = (oilSpec?.fuel_type === fuelType && oilSpec?.liters)
+    ? Math.round(oilSpec.liters) : null
+  const popularL = recommendL ?? POPULAR_LITER[fuelType]
+  const highlightLabel = recommendL ? '이 차량 권장' : '최다 사용'
 
   const handleLiterClick = (brand, liter) => {
     const fuelLabel = fuelType === 'gasoline' ? '가솔린' : '디젤'
@@ -117,6 +135,22 @@ function OilPicker({ onSelect, onClose }) {
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
+
+        {/* 차량 기반 추천 — 정보만 제공하고 선택은 아래에서 직접 누른다 */}
+        {recommendL && (
+          <div style={{
+            margin:'12px 20px 0', background:'#f0f5ff', border:'1.5px solid #b3d1ff',
+            borderRadius:12, padding:'11px 14px',
+          }}>
+            <div style={{ fontSize:12, color:'#0051d4', fontWeight:700 }}>
+              💡 이 차량 권장: {oilSpec.liters}L
+              {oilSpec.viscosity && ` · ${oilSpec.viscosity}`}
+            </div>
+            <div style={{ fontSize:11, color:'#5a7fb8', marginTop:3, lineHeight:1.5 }}>
+              {oilSpec.note} — 아래에서 실제 사용할 오일과 리터를 눌러주세요.
+            </div>
+          </div>
+        )}
 
         {/* Fuel type toggle */}
         <div style={{ padding:'12px 20px', display:'flex', gap:8 }}>
@@ -221,7 +255,7 @@ function OilPicker({ onSelect, onClose }) {
                               background:'#ff9500', color:'#fff', fontSize:9, fontWeight:800,
                               padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap',
                               letterSpacing:'0.04em'
-                            }}>최다 사용</span>
+                            }}>{highlightLabel}</span>
                           )}
                           <span style={{ fontSize: isPopular ? 28 : 20, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1, color: isPopular ? '#fff' : '#1c1c1e' }}>{liter.l}</span>
                           <span style={{ fontSize: isPopular ? 11 : 10, fontWeight:700, color: isPopular ? 'rgba(255,255,255,0.8)' : '#aeaeb2', marginTop:2 }}>리터</span>
@@ -393,6 +427,37 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
   const [items, setItems]           = useState(existingOrder?.items.map(it => ({ ...it, id: nextItemId++ })) || [])
   const [paymentType, setPaymentType] = useState(existingOrder?.paymentType || null)
 
+  // 직원 목록은 DB에서 받는다 (하드코딩하면 id가 어긋나 담당자 지정이 조용히 실패한다)
+  const [mechanics, setMechanics] = useState([])
+  useEffect(() => {
+    mechanicApi.getAll()
+      .then(setMechanics)
+      .catch(e => console.warn('직원 목록 조회 실패:', e.message))
+  }, [])
+
+  // 차종이 확정되면 권장 엔진오일 사양을 미리 조회해 둔다
+  const [oilSpec, setOilSpec]         = useState(null)
+  const [oilSpecLoading, setOilSpecLoading] = useState(false)
+
+  // 차종을 직접 고칠 수도 있으므로 디바운스 후 조회한다
+  useEffect(() => {
+    if (!model.trim()) { setOilSpec(null); return }
+    let cancelled = false
+    setOilSpecLoading(true)
+    const t = setTimeout(async () => {
+      try {
+        const spec = await fetchOilSpec({ model, year, vin })
+        // 모르는 차를 아는 척하면 오히려 위험하다 — 확신 없는 결과는 버린다
+        if (!cancelled) setOilSpec(spec.recognized && spec.confidence >= 0.6 ? spec : null)
+      } catch (e) {
+        if (!cancelled) setOilSpec(null)
+      } finally {
+        if (!cancelled) setOilSpecLoading(false)
+      }
+    }, 800)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [model, year, vin])
+
   const [modal, setModal]           = useState(null)   // null | 'oil' | 'other'
   const [saving, setSaving]         = useState(false)
   const [ocrLoading, setOcrLoading] = useState('')     // 'plate' | 'vin' | 'odometer' | ''
@@ -469,6 +534,7 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
         year:  year  ? Number(year)  : null,
         vin:   vin   || null,
         mileage: mileage ? Number(mileage.replace(/,/g, '')) : null,
+        mechanicId,
         items: items.map((it, i) => ({
           name:       it.name,
           itemType:   it.itemType || 'CUSTOM',
@@ -613,6 +679,33 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
                       <input type="text" value={vin} onChange={e => setVin(e.target.value)} placeholder="KMHD241ABNU123456" className="field-input" style={{ fontFamily:'ui-monospace,monospace', fontSize:13, letterSpacing:'0.04em' }} />
                     </div>
                   </div>
+
+                  {/* 권장 오일 사양 — 참고용, 실제 선택은 정비 내역에서 직접 누른다 */}
+                  {oilSpecLoading && (
+                    <div style={{ marginTop:12, fontSize:12, color:'#5a8a6a' }}>
+                      🔎 이 차량 권장 엔진오일 확인 중...
+                    </div>
+                  )}
+                  {!oilSpecLoading && oilSpec && (
+                    <div style={{
+                      marginTop:12, background:'#fff', border:'1.5px solid #b3d1ff',
+                      borderRadius:12, padding:'11px 14px',
+                    }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        <span style={{ fontSize:13, fontWeight:800, color:'#0051d4' }}>
+                          💡 권장 엔진오일 {oilSpec.liters}L
+                          {oilSpec.viscosity && ` · ${oilSpec.viscosity}`}
+                          {oilSpec.fuel_type && ` · ${oilSpec.fuel_type === 'diesel' ? '디젤' : '가솔린'}`}
+                        </span>
+                        <button onClick={() => setModal('oil')} className="btn btn-blue btn-xs">
+                          오일 고르기
+                        </button>
+                      </div>
+                      <div style={{ fontSize:11, color:'#8e8e93', marginTop:4, lineHeight:1.5 }}>
+                        {oilSpec.note} 참고용 추천이며, 실제 사용할 제품과 리터는 직접 선택합니다.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -647,18 +740,29 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
             <div>
               <div className="form-label" style={{ marginBottom:8 }}>담당 정비사</div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-                {MECHANICS.map(m => (
-                  <button key={m.id} onClick={() => setMechanicId(m.id)} style={{
-                    padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
-                    fontFamily:'inherit', fontSize:13, fontWeight:600,
-                    background: mechanicId === m.id ? '#1c1c1e' : '#f2f2f7',
-                    color: mechanicId === m.id ? '#fff' : '#3c3c43',
-                    display:'flex', alignItems:'center', gap:5, transition:'all 0.15s'
-                  }}>
-                    <span className={m.grade === 'A' ? 'grade-a' : 'grade-b'}>{m.grade}</span>
-                    {m.name}
-                  </button>
-                ))}
+                {mechanics.map(m => {
+                  const selected = mechanicId === m.id
+                  const isMe     = currentUser?.id === m.id
+                  return (
+                    <button key={m.id} onClick={() => setMechanicId(m.id)} style={{
+                      padding:'8px 14px', borderRadius:10, border:'none', cursor:'pointer',
+                      fontFamily:'inherit', fontSize:13, fontWeight:600,
+                      background: selected ? '#1c1c1e' : '#f2f2f7',
+                      color: selected ? '#fff' : '#3c3c43',
+                      display:'flex', alignItems:'center', gap:5, transition:'all 0.15s'
+                    }}>
+                      <span className={m.grade === 'A' ? 'grade-a' : 'grade-b'}>{m.grade}</span>
+                      {m.name}
+                      {isMe && (
+                        <span style={{
+                          fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:5,
+                          background: selected ? 'rgba(255,255,255,0.25)' : '#d1d1d6',
+                          color: selected ? '#fff' : '#6c6c70', letterSpacing:'0.03em',
+                        }}>나</span>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -668,7 +772,9 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#8e8e93', letterSpacing:'0.08em', textTransform:'uppercase' }}>정비 내역</div>
               <div style={{ display:'flex', gap:6 }}>
-                <button onClick={() => setModal('oil')}   className="btn btn-blue btn-xs">🛢️ 엔진오일</button>
+                <button onClick={() => setModal('oil')} className="btn btn-blue btn-xs">
+                  🛢️ 엔진오일{oilSpec ? ` · ${oilSpec.liters}L 권장` : ''}
+                </button>
                 <button onClick={() => setModal('other')} className="btn btn-gray btn-xs">🔧 항목 선택</button>
                 <button onClick={addEmptyItem}            className="btn btn-gray btn-xs">+ 직접 입력</button>
               </div>
@@ -740,7 +846,7 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
         </div>
       </div>
 
-      {modal === 'oil'   && <OilPicker onSelect={addPreset} onClose={() => setModal(null)} />}
+      {modal === 'oil'   && <OilPicker onSelect={addPreset} onClose={() => setModal(null)} oilSpec={oilSpec} />}
       {modal === 'other' && <OtherPresetPicker onSelect={addPreset} onClose={() => setModal(null)} />}
 
       {/* VIN / 계기판 가이드 카메라 */}

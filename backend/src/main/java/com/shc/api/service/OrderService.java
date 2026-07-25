@@ -46,8 +46,10 @@ public class OrderService {
 
     /** 신규 주문 생성 */
     @Transactional
-    public OrderResponse createOrder(OrderRequest req, Integer mechanicId) {
-        Mechanic mechanic = mechanicRepository.findById(mechanicId)
+    public OrderResponse createOrder(OrderRequest req, Integer loginMechanicId) {
+        // 화면에서 담당 정비사를 지정했으면 그 사람, 아니면 로그인한 직원
+        Integer assigneeId = req.mechanicId() != null ? req.mechanicId() : loginMechanicId;
+        Mechanic mechanic = mechanicRepository.findById(assigneeId)
                 .orElseThrow(() -> new EntityNotFoundException("직원을 찾을 수 없습니다"));
 
         // 차량 조회 또는 신규 등록

@@ -18,6 +18,9 @@ public record OrderRequest(
         Integer mileage,
         String notes,
 
+        // 담당 정비사 — 비우면 로그인한 직원이 담당이 된다
+        Integer mechanicId,
+
         @NotEmpty(message = "정비 항목을 1개 이상 입력하세요")
         List<ItemRequest> items
 ) {
