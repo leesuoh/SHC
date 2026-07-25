@@ -111,7 +111,7 @@ function OilPicker({ onSelect, onClose, oilSpec }) {
   const recommendL = (oilSpec?.fuel_type === fuelType && oilSpec?.liters)
     ? Math.round(oilSpec.liters) : null
   const popularL = recommendL ?? POPULAR_LITER[fuelType]
-  const highlightLabel = recommendL ? '이 차량 권장' : '최다 사용'
+  const highlightLabel = recommendL ? '이 차 주입량' : '최다 사용'
 
   const handleLiterClick = (brand, liter) => {
     const fuelLabel = fuelType === 'gasoline' ? '가솔린' : '디젤'
@@ -139,15 +139,20 @@ function OilPicker({ onSelect, onClose, oilSpec }) {
         {/* 차량 기반 추천 — 정보만 제공하고 선택은 아래에서 직접 누른다 */}
         {recommendL && (
           <div style={{
-            margin:'12px 20px 0', background:'#f0f5ff', border:'1.5px solid #b3d1ff',
-            borderRadius:12, padding:'11px 14px',
+            margin:'12px 20px 0', background:'#eafaf0', border:'2px solid #34c759',
+            borderRadius:14, padding:'13px 16px',
           }}>
-            <div style={{ fontSize:12, color:'#0051d4', fontWeight:700 }}>
-              💡 이 차량 권장: {oilSpec.liters}L
-              {oilSpec.viscosity && ` · ${oilSpec.viscosity}`}
+            <div style={{ display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap' }}>
+              <span style={{ fontSize:13, fontWeight:700, color:'#1a7a35' }}>🛢️ 이 차에는</span>
+              <span style={{ fontSize:26, fontWeight:900, color:'#1a7a35', letterSpacing:'-0.5px', lineHeight:1 }}>
+                {oilSpec.liters}L
+              </span>
+              <span style={{ fontSize:13, fontWeight:700, color:'#1a7a35' }}>
+                들어갑니다{oilSpec.viscosity && ` · ${oilSpec.viscosity}`}
+              </span>
             </div>
-            <div style={{ fontSize:11, color:'#5a7fb8', marginTop:3, lineHeight:1.5 }}>
-              {oilSpec.note} — 아래에서 실제 사용할 오일과 리터를 눌러주세요.
+            <div style={{ fontSize:11, color:'#5a8a6a', marginTop:5, lineHeight:1.5 }}>
+              아래 초록색 칸이 그 용량입니다. 다른 용량도 그대로 누를 수 있습니다.
             </div>
           </div>
         )}
@@ -232,34 +237,46 @@ function OilPicker({ onSelect, onClose, oilSpec }) {
                     <div style={{ borderTop:`1px dashed ${brand.color}30`, paddingTop:12, display:'flex', flexWrap:'wrap', gap:8 }}>
                       {brand.liters.map(liter => {
                         const isPopular = liter.l === popularL
+                        // 이 차에 실제로 들어가는 양일 때는 브랜드색 대신 초록으로 칠한다.
+                        // 색상(hue)은 전주의적으로 인지되므로, 주변을 무채색으로 죽이고
+                        // 하나만 유채색으로 두면 "찾는" 게 아니라 "보인다".
+                        const isFit = isPopular && !!recommendL
+                        const fitColor = '#34c759'
+                        const accent = isFit ? fitColor : brand.color
+                        // 추천이 있으면 나머지 타일의 테두리는 회색으로 낮춘다 (신호 대 잡음비)
+                        const restBorder = recommendL ? '#e5e5ea' : brand.color
+
                         return (
                         <button
                           key={liter.l}
                           onClick={() => handleLiterClick(brand, liter)}
                           style={{
                             display:'flex', flexDirection:'column', alignItems:'center',
-                            padding: isPopular ? '16px 16px' : '10px 12px',
+                            padding: isPopular ? '18px 16px' : '10px 12px',
                             borderRadius: isPopular ? 16 : 12,
-                            border:`2px solid ${brand.color}`,
-                            background: isPopular ? brand.color : '#fff',
+                            border: isPopular ? `2.5px solid ${accent}` : `2px solid ${restBorder}`,
+                            background: isPopular ? accent : '#fff',
+                            boxShadow: isFit ? `0 0 0 4px ${fitColor}28, 0 4px 14px ${fitColor}55` : 'none',
                             cursor:'pointer', fontFamily:'inherit',
                             transition:'all 0.12s',
-                            minWidth: isPopular ? 84 : 64,
-                            flex: isPopular ? '2 1 84px' : '1 1 64px',
+                            minWidth: isPopular ? 96 : 64,
+                            flex: isPopular ? '2 1 96px' : '1 1 64px',
                             position:'relative',
                           }}
                         >
                           {isPopular && (
                             <span style={{
-                              position:'absolute', top:-8, left:'50%', transform:'translateX(-50%)',
-                              background:'#ff9500', color:'#fff', fontSize:9, fontWeight:800,
-                              padding:'2px 7px', borderRadius:10, whiteSpace:'nowrap',
-                              letterSpacing:'0.04em'
+                              position:'absolute', top:-9, left:'50%', transform:'translateX(-50%)',
+                              background: isFit ? fitColor : '#ff9500', color:'#fff',
+                              fontSize:10, fontWeight:800,
+                              padding:'3px 9px', borderRadius:10, whiteSpace:'nowrap',
+                              letterSpacing:'0.02em',
+                              boxShadow: isFit ? `0 2px 8px ${fitColor}66` : 'none',
                             }}>{highlightLabel}</span>
                           )}
-                          <span style={{ fontSize: isPopular ? 28 : 20, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1, color: isPopular ? '#fff' : '#1c1c1e' }}>{liter.l}</span>
-                          <span style={{ fontSize: isPopular ? 11 : 10, fontWeight:700, color: isPopular ? 'rgba(255,255,255,0.8)' : '#aeaeb2', marginTop:2 }}>리터</span>
-                          <span style={{ fontSize: isPopular ? 15 : 12, fontWeight:800, marginTop:6, color: isPopular ? 'rgba(255,255,255,0.95)' : brand.color, fontVariantNumeric:'tabular-nums' }}>
+                          <span style={{ fontSize: isPopular ? 32 : 20, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1, color: isPopular ? '#fff' : '#1c1c1e' }}>{liter.l}</span>
+                          <span style={{ fontSize: isPopular ? 11 : 10, fontWeight:700, color: isPopular ? 'rgba(255,255,255,0.85)' : '#aeaeb2', marginTop:3 }}>리터</span>
+                          <span style={{ fontSize: isPopular ? 15 : 12, fontWeight:800, marginTop:6, color: isPopular ? 'rgba(255,255,255,0.95)' : (recommendL ? '#8e8e93' : brand.color), fontVariantNumeric:'tabular-nums' }}>
                             {(liter.price/10000).toFixed(0)}만원
                           </span>
                         </button>
@@ -688,21 +705,25 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
                   )}
                   {!oilSpecLoading && oilSpec && (
                     <div style={{
-                      marginTop:12, background:'#fff', border:'1.5px solid #b3d1ff',
-                      borderRadius:12, padding:'11px 14px',
+                      marginTop:12, background:'#fff', border:'2px solid #34c759',
+                      borderRadius:14, padding:'13px 16px',
+                      boxShadow:'0 2px 10px rgba(52,199,89,0.18)',
                     }}>
-                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
-                        <span style={{ fontSize:13, fontWeight:800, color:'#0051d4' }}>
-                          💡 권장 엔진오일 {oilSpec.liters}L
-                          {oilSpec.viscosity && ` · ${oilSpec.viscosity}`}
-                          {oilSpec.fuel_type && ` · ${oilSpec.fuel_type === 'diesel' ? '디젤' : '가솔린'}`}
-                        </span>
-                        <button onClick={() => setModal('oil')} className="btn btn-blue btn-xs">
-                          오일 고르기
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, flexWrap:'wrap' }}>
+                        <div style={{ display:'flex', alignItems:'baseline', gap:7, flexWrap:'wrap' }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:'#1a7a35' }}>🛢️ 엔진오일</span>
+                          <span style={{ fontSize:28, fontWeight:900, color:'#1a7a35', letterSpacing:'-0.6px', lineHeight:1 }}>
+                            {oilSpec.liters}L
+                          </span>
+                          <span style={{ fontSize:13, fontWeight:700, color:'#1a7a35' }}>들어갑니다</span>
+                        </div>
+                        <button onClick={() => setModal('oil')} className="btn btn-green btn-sm">
+                          오일 고르기 →
                         </button>
                       </div>
-                      <div style={{ fontSize:11, color:'#8e8e93', marginTop:4, lineHeight:1.5 }}>
-                        {oilSpec.note} 참고용 추천이며, 실제 사용할 제품과 리터는 직접 선택합니다.
+                      <div style={{ fontSize:11, color:'#5a8a6a', marginTop:5, lineHeight:1.5 }}>
+                        {oilSpec.viscosity && `${oilSpec.viscosity} · `}
+                        {oilSpec.fuel_type === 'diesel' ? '디젤' : '가솔린'} — {oilSpec.note}
                       </div>
                     </div>
                   )}
@@ -772,8 +793,8 @@ export default function RepairOrderForm({ onBack, currentUser, existingOrder }) 
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
               <div style={{ fontSize:11, fontWeight:800, color:'#8e8e93', letterSpacing:'0.08em', textTransform:'uppercase' }}>정비 내역</div>
               <div style={{ display:'flex', gap:6 }}>
-                <button onClick={() => setModal('oil')} className="btn btn-blue btn-xs">
-                  🛢️ 엔진오일{oilSpec ? ` · ${oilSpec.liters}L 권장` : ''}
+                <button onClick={() => setModal('oil')} className={`btn btn-xs ${oilSpec ? 'btn-green' : 'btn-blue'}`}>
+                  🛢️ 엔진오일{oilSpec ? ` · ${oilSpec.liters}L` : ''}
                 </button>
                 <button onClick={() => setModal('other')} className="btn btn-gray btn-xs">🔧 항목 선택</button>
                 <button onClick={addEmptyItem}            className="btn btn-gray btn-xs">+ 직접 입력</button>
