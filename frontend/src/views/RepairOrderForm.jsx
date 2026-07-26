@@ -347,62 +347,73 @@ function OtherPresetPicker({ onSelect, onClose }) {
     i.name.toLowerCase().includes(q) || (i.note || '').toLowerCase().includes(q)) : []
 
   // ── 항목 한 줄 (별 토글 + 수량 스테퍼 포함) ──
+  // 한 줄 전체가 하나의 누름 영역이다.
+  // 이전에는 이름 부분만 button이라 실제 누를 수 있는 곳이 세로 몇 px에 불과했다.
+  // 행 높이 60px — Apple HIG 최소 44pt를 넉넉히 넘긴다.
+  // 별 · 스테퍼는 행 안에 있지만 다른 동작이므로 stopPropagation으로 분리한다.
   const ItemRow = ({ item, showCategory, first }) => {
     const isFav = favIds.includes(item.id)
     const qty = qtys[item.id]
     const price = item.per ? item.price * (qty / item.per) : item.price
     return (
-      <div style={{
-        display:'flex', alignItems:'center', gap:8, padding:'11px 12px 11px 16px',
-        borderTop: first ? 'none' : '1px solid #f2f2f7', background:'#fff',
-      }}>
+      <div
+        role="button" tabIndex={0}
+        onClick={() => pick(item)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') pick(item) }}
+        style={{
+          display:'flex', alignItems:'center', gap:10,
+          minHeight:60, padding:'10px 14px 10px 10px',
+          borderTop: first ? 'none' : '1px solid #f2f2f7', background:'#fff',
+          cursor:'pointer', WebkitTapHighlightColor:'transparent',
+          transition:'background 0.1s',
+        }}
+        onMouseOver={e => e.currentTarget.style.background = '#f5f8ff'}
+        onMouseOut={e => e.currentTarget.style.background = '#fff'}
+      >
+        {/* 별 — 자체도 44px 정사각형이라 잘못 눌릴 일이 없다 */}
         <button
-          onClick={() => toggleFav(item.id)}
+          onClick={e => { e.stopPropagation(); toggleFav(item.id) }}
           title={isFav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
           style={{
-            border:'none', background:'transparent', cursor:'pointer', padding:4,
-            fontSize:17, lineHeight:1, flexShrink:0,
+            width:44, height:44, flexShrink:0,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            border:'none', background:'transparent', cursor:'pointer', padding:0,
+            fontSize:19, lineHeight:1, borderRadius:10,
             color: isFav ? '#ffb400' : '#d1d1d6',
             WebkitTapHighlightColor:'transparent',
           }}>{isFav ? '★' : '☆'}</button>
 
-        <button
-          onClick={() => pick(item)}
-          style={{
-            flex:1, minWidth:0, display:'flex', alignItems:'center', gap:8,
-            border:'none', background:'transparent', cursor:'pointer',
-            fontFamily:'inherit', textAlign:'left', padding:0,
-            WebkitTapHighlightColor:'transparent',
-          }}>
-          <div style={{ flex:1, minWidth:0 }}>
-            <div style={{ fontSize:14, color:'#1c1c1e', fontWeight:600 }}>{item.name}</div>
-            <div style={{ fontSize:11, color:'#aeaeb2', marginTop:2 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:15, color:'#1c1c1e', fontWeight:600, lineHeight:1.3 }}>{item.name}</div>
+          {(showCategory || item.note) && (
+            <div style={{ fontSize:11, color:'#aeaeb2', marginTop:3 }}>
               {showCategory && <span style={{ color:'#8e8e93' }}>{item.icon} {item.category}{item.note ? ' · ' : ''}</span>}
               {item.note}
             </div>
-          </div>
-        </button>
+          )}
+        </div>
 
-        {/* 수량 항목 — 100g 단위로 뽑는다 */}
+        {/* 수량 항목 — 100g 단위로 뽑는다. 행 클릭으로 넘어가지 않게 막는다. */}
         {item.per && (
-          <div style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}
+               onClick={e => e.stopPropagation()}>
             <StepBtn label="−" onClick={() => setQtys(p => ({ ...p, [item.id]: Math.max(item.per, p[item.id] - item.per) }))} />
-            <span style={{ fontSize:13, fontWeight:700, color:'#1c1c1e', minWidth:44, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
+            <span style={{ fontSize:13, fontWeight:700, color:'#1c1c1e', minWidth:46, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
               {qty}{item.unit}
             </span>
             <StepBtn label="+" onClick={() => setQtys(p => ({ ...p, [item.id]: p[item.id] + item.per }))} />
           </div>
         )}
 
-        <button onClick={() => pick(item)} style={{
-          border:'none', background:'transparent', cursor:'pointer', padding:'0 0 0 4px',
-          fontFamily:'inherit', flexShrink:0,
-          fontSize:15, fontWeight:700, fontVariantNumeric:'tabular-nums',
+        <span style={{
+          flexShrink:0, fontSize:15, fontWeight:700, fontVariantNumeric:'tabular-nums',
           color: price ? '#007aff' : '#c7c7cc',
-          WebkitTapHighlightColor:'transparent',
         }}>
           {price ? `${price.toLocaleString()}원` : '금액입력'}
-        </button>
+        </span>
+
+        {/* 누를 수 있는 줄이라는 신호 */}
+        <span style={{ flexShrink:0, fontSize:16, color:'#c7c7cc', lineHeight:1 }}>›</span>
       </div>
     )
   }
