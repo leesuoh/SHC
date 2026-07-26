@@ -153,8 +153,9 @@ export const OTHER_PRESETS = [
       { id: 210, name: '전(前) 브레이크 패드 교환', note: '1축 — 탈착공임 포함', price: 80000 },
       { id: 211, name: '후(後) 브레이크 패드 교환 (일반)', note: '1축 — 탈착공임 포함', price: 80000 },
       { id: 212, name: '후(後) 브레이크 패드 교환 (EPB)', note: 'Electronic Parking Brake — 리셋공임 포함', price: 90000 },
-      { id: 213, name: '브레이크 디스크 연마', note: '1축', price: 0 },
-      { id: 214, name: '브레이크 디스크 교환', note: '1축', price: 0 },
+      // 27만~30만 사이라 하나로 못 박을 수 없다. 낮은 쪽을 기본값으로 넣고
+      // 추가한 뒤 정비 내역에서 금액을 고치면 된다.
+      { id: 214, name: '브레이크 디스크 교환', note: '27만~30만 (차종별) — 추가 후 금액 조정', price: 270000 },
       { id: 215, name: '브레이크 캘리퍼 오버홀', note: '1개', price: 0 },
       { id: 201, name: '브레이크오일 교환 (DOT 3)', note: 'DOT 3 전계통', price: 70000 },
       { id: 202, name: '브레이크오일 교환 (DOT 4)', note: 'DOT 4 전계통', price: 90000 },
