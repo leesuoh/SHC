@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ENGINE_OIL_GASOLINE, ENGINE_OIL_DIESEL, OTHER_PRESETS, PAYMENT_TYPES } from '../data/mockData'
+import { ENGINE_OIL_GASOLINE, ENGINE_OIL_DIESEL, OTHER_PRESETS, DEFAULT_FAVORITE_IDS, PAYMENT_TYPES } from '../data/mockData'
 import { orderApi, paymentApi, mechanicApi } from '../api/client'
 import CameraGuideModal from '../components/CameraGuideModal'
 
@@ -294,100 +294,250 @@ function OilPicker({ onSelect, onClose, oilSpec }) {
   )
 }
 
-// ── Other Preset Picker — 세로 아코디언 ────────────────────────────────────
+// ── Other Preset Picker — 즐겨찾기 + 검색 + 계통별 아코디언 ────────────────
+//
+// 분류를 아무리 잘 해도 카테고리를 여는 순간 항상 2단계다.
+// 그런데 실제 작업의 대부분은 소수 항목(오일·패드·얼라인먼트·에어컨)에서 나온다.
+// 그 항목들은 0단계여야 한다 → 맨 위 즐겨찾기 그리드.
+//
+// 즐겨찾기는 "자동 최근 사용"이 아니라 수동 고정이다.
+// 자동이면 자리가 계속 움직여서 손이 위치를 외우지 못하고 매번 읽어야 한다.
+// 자리가 고정되어야 며칠 뒤엔 보지 않고 누르게 된다.
+const FAV_KEY = 'shc_fav_items'
+
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem(FAV_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch { /* 깨진 값이면 기본값으로 되돌린다 */ }
+  return DEFAULT_FAVORITE_IDS
+}
+
+const ALL_ITEMS = OTHER_PRESETS.flatMap(c => c.items.map(it => ({ ...it, category: c.category, icon: c.icon })))
+
+// 수량 항목(에어컨 가스)을 실제 정비 내역 한 줄로 바꾼다
+function materialize(item, qty) {
+  if (!item.per) return { name: item.name, price: item.price }
+  return { name: `${item.name} ${qty}${item.unit}`, price: item.price * (qty / item.per) }
+}
+
 function OtherPresetPicker({ onSelect, onClose }) {
-  const [openIdx, setOpenIdx] = useState(0) // 열린 카테고리 인덱스
+  const [openIdx, setOpenIdx] = useState(0)
+  const [query, setQuery] = useState('')
+  const [favIds, setFavIds] = useState(loadFavorites)
+  // 수량 항목별 현재 수량 { [itemId]: qty }
+  const [qtys, setQtys] = useState(() =>
+    Object.fromEntries(ALL_ITEMS.filter(i => i.per).map(i => [i.id, i.defaultQty])))
+
+  const toggleFav = (id) => {
+    setFavIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+      localStorage.setItem(FAV_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const pick = (item) => { onSelect(materialize(item, qtys[item.id])); onClose() }
+
+  const favItems = favIds.map(id => ALL_ITEMS.find(i => i.id === id)).filter(Boolean)
+
+  // 검색 — 두 글자만 쳐도 카테고리를 건너뛴다. 아코디언은 처음 익힐 때만 쓰인다.
+  const q = query.trim().toLowerCase()
+  const hits = q ? ALL_ITEMS.filter(i =>
+    i.name.toLowerCase().includes(q) || (i.note || '').toLowerCase().includes(q)) : []
+
+  // ── 항목 한 줄 (별 토글 + 수량 스테퍼 포함) ──
+  const ItemRow = ({ item, showCategory, first }) => {
+    const isFav = favIds.includes(item.id)
+    const qty = qtys[item.id]
+    const price = item.per ? item.price * (qty / item.per) : item.price
+    return (
+      <div style={{
+        display:'flex', alignItems:'center', gap:8, padding:'11px 12px 11px 16px',
+        borderTop: first ? 'none' : '1px solid #f2f2f7', background:'#fff',
+      }}>
+        <button
+          onClick={() => toggleFav(item.id)}
+          title={isFav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+          style={{
+            border:'none', background:'transparent', cursor:'pointer', padding:4,
+            fontSize:17, lineHeight:1, flexShrink:0,
+            color: isFav ? '#ffb400' : '#d1d1d6',
+            WebkitTapHighlightColor:'transparent',
+          }}>{isFav ? '★' : '☆'}</button>
+
+        <button
+          onClick={() => pick(item)}
+          style={{
+            flex:1, minWidth:0, display:'flex', alignItems:'center', gap:8,
+            border:'none', background:'transparent', cursor:'pointer',
+            fontFamily:'inherit', textAlign:'left', padding:0,
+            WebkitTapHighlightColor:'transparent',
+          }}>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:14, color:'#1c1c1e', fontWeight:600 }}>{item.name}</div>
+            <div style={{ fontSize:11, color:'#aeaeb2', marginTop:2 }}>
+              {showCategory && <span style={{ color:'#8e8e93' }}>{item.icon} {item.category}{item.note ? ' · ' : ''}</span>}
+              {item.note}
+            </div>
+          </div>
+        </button>
+
+        {/* 수량 항목 — 100g 단위로 뽑는다 */}
+        {item.per && (
+          <div style={{ display:'flex', alignItems:'center', gap:2, flexShrink:0 }}>
+            <StepBtn label="−" onClick={() => setQtys(p => ({ ...p, [item.id]: Math.max(item.per, p[item.id] - item.per) }))} />
+            <span style={{ fontSize:13, fontWeight:700, color:'#1c1c1e', minWidth:44, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
+              {qty}{item.unit}
+            </span>
+            <StepBtn label="+" onClick={() => setQtys(p => ({ ...p, [item.id]: p[item.id] + item.per }))} />
+          </div>
+        )}
+
+        <button onClick={() => pick(item)} style={{
+          border:'none', background:'transparent', cursor:'pointer', padding:'0 0 0 4px',
+          fontFamily:'inherit', flexShrink:0,
+          fontSize:15, fontWeight:700, fontVariantNumeric:'tabular-nums',
+          color: price ? '#007aff' : '#c7c7cc',
+          WebkitTapHighlightColor:'transparent',
+        }}>
+          {price ? `${price.toLocaleString()}원` : '금액입력'}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight:'92svh' }}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight:'92svh', display:'flex', flexDirection:'column' }}>
         <div className="modal-handle" />
         <div style={{ padding:'14px 20px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ fontSize:18, fontWeight:700, color:'#1c1c1e' }}>🔧 항목 선택</div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-        <div style={{ fontSize:12, color:'#8e8e93', padding:'4px 20px 12px' }}>
-          카테고리를 눌러 항목을 선택하세요
+
+        {/* 검색 */}
+        <div style={{ padding:'10px 20px 12px' }}>
+          <input
+            type="text" value={query} onChange={e => setQuery(e.target.value)}
+            placeholder="검색 — 예: 브레, 쇼바, 얼라"
+            style={{
+              width:'100%', height:42, borderRadius:12, border:'1.5px solid #e5e5ea',
+              background:'#f7f7f9', padding:'0 14px', fontSize:15, fontFamily:'inherit',
+              color:'#1c1c1e', outline:'none', boxSizing:'border-box',
+            }}
+            onFocus={e => e.target.style.borderColor = '#007aff'}
+            onBlur={e => e.target.style.borderColor = '#e5e5ea'}
+          />
         </div>
 
-        {/* 세로 아코디언 */}
         <div style={{ overflowY:'auto', padding:'0 20px 40px', display:'flex', flexDirection:'column', gap:8 }}>
-          {OTHER_PRESETS.map((cat, i) => {
-            const isOpen = openIdx === i
-            return (
-              <div key={cat.category} style={{
-                borderRadius: 16,
-                border: `1.5px solid ${isOpen ? '#1c1c1e' : '#e5e5ea'}`,
-                overflow: 'hidden',
-                transition: 'border-color 0.15s',
-              }}>
-                {/* 카테고리 헤더 */}
-                <button
-                  onClick={() => setOpenIdx(isOpen ? -1 : i)}
-                  style={{
-                    width:'100%', display:'flex', alignItems:'center', gap:10,
-                    padding:'14px 16px', border:'none',
-                    background: isOpen ? '#1c1c1e' : '#fafafa',
-                    cursor:'pointer', fontFamily:'inherit', textAlign:'left',
-                    transition:'background 0.15s',
-                  }}
-                >
-                  <span style={{ fontSize:20 }}>{cat.icon}</span>
-                  <span style={{ flex:1, fontSize:15, fontWeight:700,
-                    color: isOpen ? '#fff' : '#1c1c1e' }}>
-                    {cat.category}
-                  </span>
-                  <span style={{ fontSize:12, color: isOpen ? 'rgba(255,255,255,0.5)' : '#aeaeb2' }}>
-                    {cat.items.length}개
-                  </span>
-                  <span style={{
-                    fontSize:16, color: isOpen ? '#fff' : '#c7c7cc',
-                    transform: isOpen ? 'rotate(180deg)' : 'none',
-                    transition:'transform 0.2s', display:'inline-block',
-                  }}>⌄</span>
-                </button>
-
-                {/* 항목 목록 */}
-                {isOpen && (
-                  <div style={{ display:'flex', flexDirection:'column', gap:1, background:'#fff' }}>
-                    {cat.items.map((item, j) => (
-                      <button
-                        key={item.id}
-                        onClick={() => { onSelect(item); onClose() }}
-                        style={{
-                          display:'flex', justifyContent:'space-between', alignItems:'center',
-                          padding:'13px 16px',
-                          borderTop: j > 0 ? '1px solid #f2f2f7' : 'none',
-                          border:'none', background:'#fff',
-                          cursor:'pointer', fontFamily:'inherit', textAlign:'left',
-                          transition:'background 0.1s',
-                          WebkitTapHighlightColor: 'transparent',
-                        }}
-                        onMouseOver={e => e.currentTarget.style.background='#f9f9fb'}
-                        onMouseOut={e => e.currentTarget.style.background='#fff'}
-                      >
-                        <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:14, color:'#1c1c1e', fontWeight:600 }}>{item.name}</div>
-                          {item.note && (
-                            <div style={{ fontSize:11, color:'#aeaeb2', marginTop:2 }}>{item.note}</div>
-                          )}
-                        </div>
-                        <span style={{
-                          fontSize:15, color:'#007aff', fontWeight:700,
-                          fontVariantNumeric:'tabular-nums', flexShrink:0, marginLeft:12
-                        }}>
-                          {item.price.toLocaleString()}원
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+          {q ? (
+            /* ── 검색 결과 ── */
+            hits.length ? (
+              <div style={{ borderRadius:16, border:'1.5px solid #e5e5ea', overflow:'hidden' }}>
+                {hits.map((item, j) => <ItemRow key={item.id} item={item} showCategory first={j === 0} />)}
+              </div>
+            ) : (
+              <div style={{ textAlign:'center', color:'#aeaeb2', fontSize:14, padding:'40px 0' }}>
+                「{query}」 에 맞는 항목이 없습니다
               </div>
             )
-          })}
+          ) : (
+            <>
+              {/* ── 즐겨찾기 — 자리가 움직이지 않는 4×2 그리드 ── */}
+              {favItems.length > 0 && (
+                <div style={{ marginBottom:4 }}>
+                  <div style={{ fontSize:11, fontWeight:800, color:'#8e8e93', letterSpacing:'0.05em', padding:'0 2px 8px' }}>
+                    ★ 자주 쓰는 항목
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:8 }}>
+                    {favItems.map(item => {
+                      const qty = qtys[item.id]
+                      const price = item.per ? item.price * (qty / item.per) : item.price
+                      return (
+                        <button key={item.id} onClick={() => pick(item)} style={{
+                          display:'flex', flexDirection:'column', justifyContent:'space-between',
+                          gap:6, minHeight:66, padding:'10px 12px',
+                          borderRadius:14, border:'1.5px solid #ffd980', background:'#fffaf0',
+                          cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                          WebkitTapHighlightColor:'transparent',
+                        }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:'#1c1c1e', lineHeight:1.3 }}>
+                            {item.name}{item.per ? ` ${qty}${item.unit}` : ''}
+                          </span>
+                          <span style={{ fontSize:14, fontWeight:800, color: price ? '#b8860b' : '#c7c7cc', fontVariantNumeric:'tabular-nums' }}>
+                            {price ? `${price.toLocaleString()}원` : '금액입력'}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── 계통별 아코디언 ── */}
+              {OTHER_PRESETS.map((cat, i) => {
+                const isOpen = openIdx === i
+                return (
+                  <div key={cat.category} style={{
+                    borderRadius: 16,
+                    border: `1.5px solid ${isOpen ? '#1c1c1e' : '#e5e5ea'}`,
+                    overflow: 'hidden',
+                    transition: 'border-color 0.15s',
+                  }}>
+                    <button
+                      onClick={() => setOpenIdx(isOpen ? -1 : i)}
+                      style={{
+                        width:'100%', display:'flex', alignItems:'center', gap:10,
+                        padding:'14px 16px', border:'none',
+                        background: isOpen ? '#1c1c1e' : '#fafafa',
+                        cursor:'pointer', fontFamily:'inherit', textAlign:'left',
+                        transition:'background 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize:20 }}>{cat.icon}</span>
+                      <span style={{ flex:1, fontSize:15, fontWeight:700,
+                        color: isOpen ? '#fff' : '#1c1c1e' }}>
+                        {cat.category}
+                      </span>
+                      <span style={{ fontSize:12, color: isOpen ? 'rgba(255,255,255,0.5)' : '#aeaeb2' }}>
+                        {cat.items.length}개
+                      </span>
+                      <span style={{
+                        fontSize:16, color: isOpen ? '#fff' : '#c7c7cc',
+                        transform: isOpen ? 'rotate(180deg)' : 'none',
+                        transition:'transform 0.2s', display:'inline-block',
+                      }}>⌄</span>
+                    </button>
+
+                    {isOpen && cat.items.map((item, j) => (
+                      <ItemRow key={item.id} item={item} first={j === 0} />
+                    ))}
+                  </div>
+                )
+              })}
+
+              <div style={{ fontSize:11, color:'#aeaeb2', textAlign:'center', padding:'8px 0 0' }}>
+                ☆ 를 누르면 자주 쓰는 항목에 고정됩니다
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
+  )
+}
+
+function StepBtn({ label, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      width:28, height:28, borderRadius:8, border:'1px solid #e5e5ea',
+      background:'#fff', cursor:'pointer', fontFamily:'inherit',
+      fontSize:15, fontWeight:700, color:'#1c1c1e', lineHeight:1,
+      display:'flex', alignItems:'center', justifyContent:'center', padding:0,
+      WebkitTapHighlightColor:'transparent',
+    }}>{label}</button>
   )
 }
 
